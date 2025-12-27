@@ -13,30 +13,26 @@ export function InstallPWA() {
         const ios = /iphone|ipad|ipod/.test(userAgent)
         setIsIos(ios)
 
-        // 2. Detekce, zda už je aplikace nainstalovaná (Standalone mode)
+        // 2. Detekce, zda už je aplikace nainstalovaná
         const isInStandaloneMode = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true
         setIsStandalone(isInStandaloneMode)
 
-        // 3. Zachycení události pro Android/Chrome instalaci
+        // 3. Zachycení události pro Android
         const handleBeforeInstallPrompt = (e) => {
             e.preventDefault()
             setDeferredPrompt(e)
         }
 
         window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
-
         return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
     }, [])
 
-    // Pokud už je nainstalováno, nic nezobrazujeme
     if (isStandalone) return null
 
     const handleInstallClick = async () => {
         if (isIos) {
-            // Na iOS nemůžeme instalovat programově, musíme ukázat návod
             setShowIosInstructions(true)
         } else if (deferredPrompt) {
-            // Na Androidu spustíme nativní výzvu
             deferredPrompt.prompt()
             const { outcome } = await deferredPrompt.userChoice
             if (outcome === 'accepted') {
@@ -45,12 +41,11 @@ export function InstallPWA() {
         }
     }
 
-    // Pokud nemáme prompt (Android) a nejsme na iOS, tlačítko skryjeme (např. na PC v nepodporovaném prohlížeči)
     if (!deferredPrompt && !isIos) return null
 
     return (
         <>
-            {/* TLAČÍTKO V MENU (Toto vložíme do Navbaru) */}
+            {/* Tlačítko v menu */}
             <button 
                 onClick={handleInstallClick} 
                 className="p-2 rounded-full transition-all duration-300 flex flex-col items-center justify-center relative group text-green-400 hover:text-green-300 animate-pulse"
@@ -59,11 +54,15 @@ export function InstallPWA() {
                 <Download className="w-6 h-6"/>
             </button>
 
-            {/* MODÁL S NÁVODEM PRO iOS */}
+            {/* MODÁL S NÁVODEM PRO iOS (OPRAVA: items-center místo items-end) */}
             {showIosInstructions && (
-                <div className="fixed inset-0 z-[1000] flex items-end sm:items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn" onClick={() => setShowIosInstructions(false)}>
-                    <div className="glass-panel w-full max-w-sm p-6 rounded-3xl border border-white/10 bg-[#0f172a] relative" onClick={e => e.stopPropagation()}>
-                        <button onClick={() => setShowIosInstructions(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white">
+                <div 
+                    className="fixed inset-0 z-[2000] flex items-center justify-center p-6 bg-black/90 backdrop-blur-md animate-fadeIn" 
+                    onClick={() => setShowIosInstructions(false)}
+                    style={{ paddingBottom: 'env(safe-area-inset-bottom)' }} // Pojistka pro iPhone X+
+                >
+                    <div className="glass-panel w-full max-w-sm p-6 rounded-3xl border border-white/10 bg-[#0f172a] relative shadow-2xl" onClick={e => e.stopPropagation()}>
+                        <button onClick={() => setShowIosInstructions(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white p-2">
                             <X className="w-6 h-6"/>
                         </button>
                         
@@ -72,22 +71,24 @@ export function InstallPWA() {
                                 <Download className="w-8 h-8 text-blue-500"/>
                             </div>
                             <h3 className="text-xl font-bold text-white mb-2">Instalace na iOS</h3>
-                            <p className="text-sm text-slate-400">Aplikaci nainstalujete na plochu vašeho iPhonu ve dvou krocích:</p>
+                            <p className="text-sm text-slate-400 leading-relaxed">Aplikaci nainstalujete na plochu vašeho iPhonu ve dvou krocích:</p>
                         </div>
 
-                        <div className="space-y-4">
-                            <div className="flex items-center gap-4 p-3 rounded-xl bg-white/5 border border-white/5">
-                                <Share className="w-6 h-6 text-blue-400"/>
-                                <div className="text-sm text-slate-300">1. Klikněte na tlačítko <span className="font-bold text-white">Sdílet</span> v dolní liště prohlížeče.</div>
+                        <div className="space-y-3">
+                            <div className="flex items-center gap-4 p-4 rounded-2xl bg-white/5 border border-white/5">
+                                <Share className="w-6 h-6 text-blue-400 shrink-0"/>
+                                <div className="text-sm text-slate-300">1. Klikněte na tlačítko <span className="font-bold text-white">Sdílet</span> v dolní liště.</div>
                             </div>
-                            <div className="flex items-center gap-4 p-3 rounded-xl bg-white/5 border border-white/5">
-                                <PlusSquare className="w-6 h-6 text-slate-200"/>
-                                <div className="text-sm text-slate-300">2. V menu vyberte možnost <span className="font-bold text-white">Přidat na plochu</span>.</div>
+                            <div className="flex items-center gap-4 p-4 rounded-2xl bg-white/5 border border-white/5">
+                                <PlusSquare className="w-6 h-6 text-slate-200 shrink-0"/>
+                                <div className="text-sm text-slate-300">2. Vyberte <span className="font-bold text-white">Přidat na plochu</span>.</div>
                             </div>
                         </div>
 
-                        <div className="mt-6 text-center text-xs text-slate-500">
-                            Klikněte kamkoliv pro zavření
+                        <div className="mt-8 text-center">
+                            <button onClick={() => setShowIosInstructions(false)} className="text-xs font-bold text-slate-500 uppercase tracking-wider hover:text-white transition-colors">
+                                Zavřít návod
+                            </button>
                         </div>
                     </div>
                 </div>
