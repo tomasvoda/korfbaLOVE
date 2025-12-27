@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
 import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext'
-import { Home, Shield, LogOut, User, Loader2, Crown, Menu, Download } from 'lucide-react'
+import { Home, Shield, LogOut, User, Loader2, Crown, Menu } from 'lucide-react'
 import { supabase } from './supabaseClient'
 import toast from 'react-hot-toast'
 
+// Stránky
 import SeznamOsob from './pages/SeznamOsob'
 import DetailOsoby from './pages/DetailOsoby'
 import Login from './pages/Login'
@@ -12,29 +13,19 @@ import Register from './pages/Register'
 import AdminDashboard from './pages/AdminDashboard'
 import ForgotPassword from './pages/ForgotPassword'
 
+// Komponenty
+import { InstallPWA } from './components/InstallPWA' // <--- Nová chytrá instalace
+
 function Navbar() {
     const { user, isAdmin, profil, loading } = useAuth()
     const location = useLocation()
     const navigate = useNavigate()
+    
+    // UI Stavy
     const [isExpanded, setIsExpanded] = useState(true)
     const [lastScrollY, setLastScrollY] = useState(0)
-    const [deferredPrompt, setDeferredPrompt] = useState(null)
 
-    // PWA: Zachycení události pro instalaci
-    useEffect(() => {
-        window.addEventListener('beforeinstallprompt', (e) => {
-            e.preventDefault()
-            setDeferredPrompt(e)
-        })
-    }, [])
-
-    const handleInstallClick = async () => {
-        if (!deferredPrompt) return
-        deferredPrompt.prompt()
-        const { outcome } = await deferredPrompt.userChoice
-        if (outcome === 'accepted') setDeferredPrompt(null)
-    }
-
+    // Odhlášení
     const handleLogout = async () => {
         try {
             await supabase.auth.signOut()
@@ -46,6 +37,7 @@ function Navbar() {
         }
     }
 
+    // Automatické sbalení menu při scrollování
     useEffect(() => {
         const handleScroll = () => {
             const currentScrollY = window.scrollY
@@ -60,6 +52,7 @@ function Navbar() {
         if (!user) toast.error('Pro detail musíte být přihlášen.', { style: { background: '#1e293b', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }, icon: '🔒' })
     }
 
+    // Styly pro menu
     const containerClasses = isExpanded
         ? "left-1/2 -translate-x-1/2 px-5 py-2 rounded-full w-auto" 
         : "left-6 translate-x-0 p-0 rounded-full w-14 h-14 justify-center cursor-pointer border-blue-500/30 hover:scale-110 active:scale-95 flex items-center bg-[#0f172a]"
@@ -82,11 +75,13 @@ function Navbar() {
             {isExpanded ? (
                 <div className="flex items-center gap-3 sm:gap-5">
                     
+                    {/* DOMŮ */}
                     <Link to="/" className={`${baseIconStyle} ${location.pathname === '/' ? activeStyle : inactiveStyle}`}>
                         <Home className="w-6 h-6"/>
                         {location.pathname === '/' && <ActiveDot />}
                     </Link>
 
+                    {/* PROFIL UŽIVATELE */}
                     {loading ? (
                         <div className="p-2"><Loader2 className="w-6 h-6 text-slate-500 animate-spin"/></div>
                     ) : (user && profil) ? (
@@ -107,6 +102,7 @@ function Navbar() {
                         </button>
                     )}
 
+                    {/* ADMIN PANEL (jen pro adminy) */}
                     {isAdmin && (
                         <Link to="/admin" className={`${baseIconStyle} ${location.pathname === '/admin' ? activeStyle : inactiveStyle}`}>
                             <Crown className="w-6 h-6"/>
@@ -114,13 +110,10 @@ function Navbar() {
                         </Link>
                     )}
                     
-                    {/* TLAČÍTKO INSTALACE APLIKACE (jen když je dostupné) */}
-                    {deferredPrompt && (
-                        <button onClick={handleInstallClick} className={`${baseIconStyle} text-green-400 hover:text-green-300 animate-pulse`}>
-                            <Download className="w-6 h-6"/>
-                        </button>
-                    )}
+                    {/* TLAČÍTKO INSTALACE PWA (Chytrá komponenta) */}
+                    <InstallPWA />
 
+                    {/* ODHLÁŠENÍ / PŘIHLÁŠENÍ */}
                     {user ? (
                         <button onClick={handleLogout} className={`${baseIconStyle} ${inactiveStyle} hover:text-red-400`}>
                             <LogOut className="w-6 h-6"/>
@@ -133,6 +126,7 @@ function Navbar() {
                     )}
                 </div>
             ) : (
+                // Sbalené menu (jen jedna ikona indikující sekci)
                 <div className="w-full h-full flex items-center justify-center animate-fadeIn rounded-full overflow-hidden">
                      {location.pathname === '/' ? <Home className="w-6 h-6 text-white"/> :
                       location.pathname === '/admin' ? <Crown className="w-6 h-6 text-white"/> :
@@ -160,4 +154,5 @@ function App() {
     </>
   )
 }
+
 export default App
