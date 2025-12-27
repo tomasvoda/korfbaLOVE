@@ -8,10 +8,19 @@ export function LicenceCard({ licence, stats, onClick, jeAdmin, canEdit, onReque
     
     const dateFmt = (d) => d ? new Date(d).toLocaleDateString('cs-CZ') : '??'
     
-    // --- VÝPOČET STATISTIK A PROGRESU ---
-    // (Používáme prop 'stats' předanou z rodiče)
-    const percent = stats.req > 0 ? Math.min(100, (stats.projected / stats.req) * 100) : 0
-    const progressColor = percent >= 100 ? 'bg-green-500' : percent >= 50 ? 'bg-orange-500' : 'bg-red-500'
+    // --- VÝPOČET PROGRESU ---
+    // 1. Procento pro AKTUÁLNÍ stav (Sytý pruh)
+    const percentCurrent = stats.req > 0 ? Math.min(100, (stats.current / stats.req) * 100) : 0
+    
+    // 2. Procento pro PŘEDPOKLAD (Průhledný pruh v pozadí)
+    const percentProjected = stats.req > 0 ? Math.min(100, (stats.projected / stats.req) * 100) : 0
+    
+    // Barva sytého pruhu (podle aktuálního plnění)
+    const progressColor = percentCurrent >= 100 ? 'bg-green-500' : percentCurrent >= 50 ? 'bg-orange-500' : 'bg-red-500'
+    
+    // Barva "duch" pruhu (předpoklad) - zelená pokud je plánováno splnění, jinak bílá
+    const ghostColor = percentProjected >= 100 ? 'bg-green-400/30' : 'bg-white/10'
+
     const showStats = stats.req > 0
 
     // --- VÝPOČET DNÍ DO EXPIRACE ---
@@ -51,7 +60,7 @@ export function LicenceCard({ licence, stats, onClick, jeAdmin, canEdit, onReque
                     )}
                 </div>
 
-                {/* DATUMY: Získáno - Platnost */}
+                {/* DATUMY */}
                 <div className="flex justify-between items-center w-full relative py-1">
                     <div className="flex flex-col">
                         <span className="text-[9px] font-bold text-slate-600 uppercase tracking-wider mb-0.5">Získáno</span>
@@ -67,7 +76,7 @@ export function LicenceCard({ licence, stats, onClick, jeAdmin, canEdit, onReque
                 {/* SPODNÍ ČÁST: Statistiky + Akce */}
                 <div className="mt-1 pt-3 border-t border-white/5 flex flex-col gap-3">
                     
-                    {/* STATISTIKY (Progres bar) */}
+                    {/* STATISTIKY (Nový dvojitý progres bar) */}
                     {showStats && (
                         <div>
                             <div className="flex justify-between items-end mb-2 text-xs">
@@ -78,8 +87,20 @@ export function LicenceCard({ licence, stats, onClick, jeAdmin, canEdit, onReque
                                     Předpoklad: <span className={stats.projected >= stats.req ? "text-green-400 font-bold" : "text-white"}>{stats.projected}</span><span className="text-slate-600"> / {stats.req}</span>
                                 </div>
                             </div>
-                            <div className="h-1.5 w-full bg-slate-700/30 rounded-full overflow-hidden">
-                                <div className={`h-full ${progressColor} transition-all duration-1000 ease-out shadow-[0_0_10px_rgba(0,0,0,0.5)]`} style={{ width: `${percent}%` }}></div>
+                            
+                            {/* Kontejner lišty */}
+                            <div className="h-2 w-full bg-slate-700/30 rounded-full overflow-hidden relative">
+                                {/* 1. GHOST BAR (Předpoklad) - V pozadí */}
+                                <div 
+                                    className={`absolute top-0 left-0 h-full ${ghostColor} transition-all duration-1000 ease-out`} 
+                                    style={{ width: `${percentProjected}%` }}
+                                ></div>
+                                
+                                {/* 2. MAIN BAR (Aktuální) - V popředí */}
+                                <div 
+                                    className={`absolute top-0 left-0 h-full ${progressColor} transition-all duration-1000 ease-out shadow-[0_0_10px_rgba(0,0,0,0.5)]`} 
+                                    style={{ width: `${percentCurrent}%` }}
+                                ></div>
                             </div>
                         </div>
                     )}
@@ -92,7 +113,7 @@ export function LicenceCard({ licence, stats, onClick, jeAdmin, canEdit, onReque
                         </div>
                         
                         <div className="flex gap-2 relative z-20" onClick={(e) => e.stopPropagation()}>
-                            {/* A) ADMIN AKCE (Vidí jen admin) */}
+                            {/* ADMIN AKCE */}
                             {jeAdmin && (
                                 <>
                                     <button onClick={() => onRenew(licence)} className="flex items-center gap-1.5 text-[10px] font-bold bg-white/5 hover:bg-blue-600 hover:text-white text-slate-300 px-2 py-1.5 rounded-lg transition-all border border-white/10" title="Prodloužit licenci">
@@ -104,7 +125,7 @@ export function LicenceCard({ licence, stats, onClick, jeAdmin, canEdit, onReque
                                 </>
                             )}
                             
-                            {/* B) UŽIVATEL AKCE (Vidí jen majitel = canEdit, pokud není admin) */}
+                            {/* UŽIVATEL AKCE */}
                             {!jeAdmin && canEdit && (
                                 licence.zadost_o_prodlouzeni ? (
                                     <div className="flex items-center gap-2 text-[10px] font-bold text-yellow-500 bg-yellow-500/10 px-2 py-1.5 rounded-lg border border-yellow-500/20 cursor-default">

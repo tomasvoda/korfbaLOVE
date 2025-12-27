@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useNavigate, Link } from 'react-router-dom'
-import { Shield } from 'lucide-react'
+import { Mail, Lock, ArrowRight, Loader2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 function Login() {
@@ -13,51 +13,52 @@ function Login() {
     const handleLogin = async (e) => {
         e.preventDefault()
         setLoading(true)
-        
         const { error } = await supabase.auth.signInWithPassword({ email, password })
-
         if (error) {
             toast.error(error.message)
+            setLoading(false)
         } else {
-            toast.success('Vítejte!')
-            // ZMĚNA: Po přihlášení jdeme na hlavní seznam
+            toast.success('Vítejte zpět!')
             navigate('/')
         }
-        setLoading(false)
     }
 
     return (
-        <div className="min-h-screen flex items-center justify-center p-4">
-            <div className="glass-panel p-8 rounded-3xl w-full max-w-md border border-white/10">
+        <div className="min-h-screen flex items-center justify-center p-4 page-enter">
+            <div className="max-w-md w-full glass-panel p-8 rounded-3xl border border-white/10 relative bg-[#0f172a]/50">
                 <div className="text-center mb-8">
-                    <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-500/20">
-                        <Shield className="w-8 h-8 text-white"/>
-                    </div>
-                    <h1 className="text-2xl font-black text-white">Přihlášení</h1>
+                    <h1 className="text-3xl font-black text-white mb-2">Přihlášení</h1>
+                    <p className="text-slate-400 text-sm">Vstup do evidence ČKS</p>
                 </div>
+
                 <form onSubmit={handleLogin} className="space-y-4">
-                    <input 
-                        type="email" 
-                        placeholder="Email" 
-                        className="w-full glass-input p-4 rounded-xl" 
-                        value={email} 
-                        onChange={e=>setEmail(e.target.value)} 
-                        required 
-                    />
-                    <input 
-                        type="password" 
-                        placeholder="Heslo" 
-                        className="w-full glass-input p-4 rounded-xl" 
-                        value={password} 
-                        onChange={e=>setPassword(e.target.value)} 
-                        required 
-                    />
-                    <button disabled={loading} className="w-full btn-primary py-4 rounded-xl font-bold text-lg">
-                        {loading ? 'Ověřuji...' : 'Přihlásit se'}
+                    <div className="space-y-4">
+                        <div className="relative">
+                            <Mail className="absolute left-4 top-3.5 text-slate-500 w-5 h-5"/>
+                            <input type="email" required placeholder="E-mail" value={email} onChange={e => setEmail(e.target.value)} 
+                                className="w-full bg-slate-900/50 border border-white/10 rounded-xl p-3 pl-12 text-white focus:outline-none focus:border-blue-500 transition-colors placeholder-slate-500" />
+                        </div>
+                        <div className="relative">
+                            <Lock className="absolute left-4 top-3.5 text-slate-500 w-5 h-5"/>
+                            <input type="password" required placeholder="Heslo" value={password} onChange={e => setPassword(e.target.value)} 
+                                className="w-full bg-slate-900/50 border border-white/10 rounded-xl p-3 pl-12 text-white focus:outline-none focus:border-blue-500 transition-colors placeholder-slate-500" />
+                        </div>
+                    </div>
+
+                    <div className="flex justify-end">
+                        <Link to="/forgot-password" class="text-xs text-blue-400 hover:text-white transition-colors font-medium">
+                            Zapomněli jste heslo?
+                        </Link>
+                    </div>
+
+                    <button disabled={loading} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2 active:scale-95">
+                        {loading ? <Loader2 className="w-5 h-5 animate-spin"/> : <>Přihlásit se <ArrowRight className="w-5 h-5"/></>}
                     </button>
                 </form>
-                <div className="mt-6 text-center pt-6 border-t border-white/5">
-                    <p className="text-slate-400 text-sm">Jste tu poprvé? <Link to="/register" className="text-blue-400 font-bold hover:underline">Aktivovat profil</Link></p>
+
+                <div className="mt-8 text-center">
+                    <p className="text-slate-400 text-sm">Nemáte ještě účet?</p>
+                    <Link to="/register" className="text-blue-400 font-bold hover:text-white transition-colors text-sm">Aktivovat profil</Link>
                 </div>
             </div>
         </div>

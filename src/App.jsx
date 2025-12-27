@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom' // UŽ ŽÁDNÝ "Router" nebo "BrowserRouter"
+import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext'
 import { Home, Shield, LogOut, User, Loader2, Crown, Menu, Download } from 'lucide-react'
 import { supabase } from './supabaseClient'
@@ -20,7 +20,7 @@ function Navbar() {
     const [lastScrollY, setLastScrollY] = useState(0)
     const [deferredPrompt, setDeferredPrompt] = useState(null)
 
-    // PWA Install
+    // PWA: Zachycení události pro instalaci
     useEffect(() => {
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault()
@@ -35,7 +35,6 @@ function Navbar() {
         if (outcome === 'accepted') setDeferredPrompt(null)
     }
 
-    // BEZPEČNÉ ODHLÁŠENÍ
     const handleLogout = async () => {
         try {
             await supabase.auth.signOut()
@@ -43,11 +42,10 @@ function Navbar() {
         } catch (error) {
             console.error("Chyba odhlášení:", error)
         } finally {
-            navigate('/login') // Vždy přesměruje
+            navigate('/login')
         }
     }
 
-    // Scroll logika
     useEffect(() => {
         const handleScroll = () => {
             const currentScrollY = window.scrollY
@@ -116,6 +114,7 @@ function Navbar() {
                         </Link>
                     )}
                     
+                    {/* TLAČÍTKO INSTALACE APLIKACE (jen když je dostupné) */}
                     {deferredPrompt && (
                         <button onClick={handleInstallClick} className={`${baseIconStyle} text-green-400 hover:text-green-300 animate-pulse`}>
                             <Download className="w-6 h-6"/>
@@ -135,7 +134,6 @@ function Navbar() {
                 </div>
             ) : (
                 <div className="w-full h-full flex items-center justify-center animate-fadeIn rounded-full overflow-hidden">
-                    {/* Logika pro sbalenou ikonu */}
                      {location.pathname === '/' ? <Home className="w-6 h-6 text-white"/> :
                       location.pathname === '/admin' ? <Crown className="w-6 h-6 text-white"/> :
                       location.pathname === '/login' ? <Shield className="w-6 h-6 text-white"/> :

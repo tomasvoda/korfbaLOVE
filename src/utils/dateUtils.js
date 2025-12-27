@@ -1,5 +1,3 @@
-// src/utils/dateUtils.js
-
 const SVATKY_FIXNI = ['1-1', '5-1', '5-8', '7-5', '7-6', '9-28', '10-28', '11-17', '12-24', '12-25', '12-26']
 
 export const getAktualniSezona = () => {
@@ -72,7 +70,6 @@ export const generovatTerminy = (datumOd, datumDo, denVTydnuInput, vynechaneDatu
         let aktivni = !jeSvatek
         
         // Pokud je v poli vynechaných, invertujeme stav
-        // (Svátek -> Aktivní, Aktivní -> Zrušeno)
         const safeVynechane = Array.isArray(vynechaneDatumy) ? vynechaneDatumy : []
         const manualne = safeVynechane.includes(isoDate)
         
@@ -88,24 +85,50 @@ export const generovatTerminy = (datumOd, datumDo, denVTydnuInput, vynechaneDatu
         current.setDate(current.getDate() + 7)
     }
     return terminy
-
 }
 
 export const vypocitatPlatnostLicence = (datumZiskaniIso) => {
     if (!datumZiskaniIso) return ''
-
     const datumZiskani = new Date(datumZiskaniIso)
     const hraniceLegacy = new Date('2022-12-27')
-    
     let vychoziRok = datumZiskani.getFullYear()
-
-    // PRAVIDLO: Na licence před 27.12.2022 se pohlíží jako na získané v roce 2022
-    if (datumZiskani < hraniceLegacy) {
-        vychoziRok = 2022
-    }
-
-    // PRAVIDLO: Platnost do 30. 6. třetího kalendářního roku
+    if (datumZiskani < hraniceLegacy) { vychoziRok = 2022 }
     const cilovyRok = vychoziRok + 3
-
     return `${cilovyRok}-06-30`
+}
+
+// --- NOVÁ FUNKCE PRO VÝPOČET KREDITŮ NA KARTU ---
+export const spocitatKredityDetail = (aktivita) => {
+    if (!aktivita) return { aktualni: 0, celkem: 0 }
+
+    // 1. Vygenerujeme všechny termíny (minulé i budoucí)
+    const terminy = generovatTerminy(
+        aktivita.datum_od, 
+        aktivita.datum_do, 
+        aktivita.den_v_tydnu, 
+        aktivita.vynechane_datumy
+    )
+
+    const dnes = new Date()
+    dnes.setHours(0, 0, 0, 0) // Reset času pro přesné porovnání dnů
+
+    let pocetAktualni = 0
+    let pocetCelkem = 0
+
+    terminy.forEach(t => {
+        if (t.aktivni) {
+            pocetCelkem++
+            // Pokud termín již proběhl nebo je dnes
+            if (new Date(t.datum) <= dnes) {
+                pocetAktualni++
+            }
+        }
+    })
+
+    const jednotky = aktivita.pocet_jednotek || 1
+
+    return {
+        aktualni: pocetAktualni * jednotky,
+        celkem: pocetCelkem * jednotky
+    }
 }
