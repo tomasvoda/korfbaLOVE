@@ -1,16 +1,16 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
-import { ArrowLeft, Mail, Phone, Shield, Calendar, Award, ExternalLink, Clock, AlertCircle, CheckCircle } from 'lucide-react'
+import { ArrowLeft, Mail, Phone, Shield, Calendar, Award, ExternalLink, Clock, AlertCircle, CheckCircle, RefreshCw, Loader2 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
-import { useData } from '../contexts/DataContext' // 1. Importujeme cache
+import { useData } from '../contexts/DataContext'
 import toast from 'react-hot-toast'
 
 function DetailOsoby() {
     const { id } = useParams()
     const navigate = useNavigate()
     const { user, isOwner } = useAuth()
-    const { osoby } = useData() // 2. Vytáhneme si data z paměti
+    const { osoby } = useData() 
     
     const [osoba, setOsoba] = useState(null)
     const [loading, setLoading] = useState(true)
@@ -21,35 +21,55 @@ function DetailOsoby() {
             const cachedOsoba = osoby.find(o => String(o.id) === String(id))
             if (cachedOsoba) {
                 setOsoba(cachedOsoba)
-                setLoading(false) // Už nenačítáme, data máme
+                setLoading(false)
             }
         }
     }, [id, osoby])
 
-    // B. NAČTENÍ ČERSTVÝCH DAT NA POZADÍ (pro jistotu)
+    // B. NAČTENÍ ČERSTVÝCH DAT NA POZADÍ
     useEffect(() => {
+        let isMounted = true // Sledování, zda je komponenta stále na obrazovce
+
         const fetchFresh = async () => {
-            // Pokud nemáme cache, musíme ukázat loading. Pokud cache máme, loading neukazujeme (uživatel už se dívá na data)
+            // Loading zobrazíme jen pokud nemáme žádná data (ani z cache)
             if (!osoba && osoby.length === 0) setLoading(true)
 
-            const { data, error } = await supabase
-                .from('osoby')
-                .select('*, licence(*), kluby(nazev)')
-                .eq('id', id)
-                .single()
+            try {
+                const { data, error } = await supabase
+                    .from('osoby')
+                    .select('*, licence(*), kluby(nazev)')
+                    .eq('id', id)
+                    .maybeSingle() // Použití maybeSingle je bezpečnější než single()
 
-            if (error) {
-                if (!osoba) toast.error("Osoba nenalezena") // Chybu hlásíme jen když nemáme ani cache
-                if (!osoba) navigate('/')
-            } else {
-                setOsoba(data) // Aktualizujeme data (kdyby se něco změnilo)
+                if (!isMounted) return
+
+                if (error) throw error
+
+                if (data) {
+                    setOsoba(data)
+                } else {
+                    // Pokud data nemáme a ani jsme je nenašli v DB -> 404
+                    if (!osoba) {
+                        toast.error("Osoba nenalezena")
+                        navigate('/')
+                    }
+                }
+            } catch (error) {
+                console.error("Chyba načítání profilu:", error)
+                if (!osoba && isMounted) {
+                    toast.error("Chyba při načítání dat")
+                }
+            } finally {
+                if (isMounted) setLoading(false)
             }
-            setLoading(false)
         }
+
         fetchFresh()
+
+        // Cleanup funkce
+        return () => { isMounted = false }
     }, [id])
 
-    // ... Zbytek funkcí (handleUpdate, zadost atd.) zůstává stejný ...
     const handleUpdate = async (licenceId) => {
         toast.promise(
             async () => {
@@ -65,10 +85,9 @@ function DetailOsoby() {
         )
     }
 
-    if (loading) return <div className="p-20 text-center text-slate-500 animate-pulse">Načítám profil...</div>
+    if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-slate-500 w-10 h-10"/></div>
     if (!osoba) return null
 
-    // ... RENDER (HTML) ZŮSTÁVÁ STEJNÝ, jen vkládám začátek pro kontext ...
     return (
         <div className="max-w-4xl mx-auto p-4 pb-32 pt-8 animate-fadeIn">
             {/* Header s tlačítkem Zpět */}
@@ -82,10 +101,9 @@ function DetailOsoby() {
                         <Shield className="w-3 h-3"/> {osoba.kluby?.nazev || 'Bez klubové příslušnosti'}
                     </div>
                 </div>
-                {/* Tlačítka pro editaci (jen Admin/Owner) */}
+                {/* Tlačítka pro editaci (jen Admin/Owner) - placeholder z původního kódu */}
                 {isOwner(osoba.id) && (
                     <div className="ml-auto flex gap-2">
-                        {/* Zde by byla tlačítka editace */}
                     </div>
                 )}
             </div>
@@ -94,7 +112,7 @@ function DetailOsoby() {
                 {/* Karta OSOBNÍ ÚDAJE */}
                 <div className="glass-panel p-6 rounded-3xl border border-white/5 h-fit">
                     <div className="flex flex-col items-center text-center mb-6">
-                        <div className="w-32 h-32 rounded-full bg-slate-800 mb-4 overflow-hidden border-4 border-slate-700/50 shadow-2xl">
+                        <div className="w-32 h-32 rounded-full bg-slate-800 mb-4 overflow-hidden border-4 border-slate-700/50 shadow-2xl relative">
                             {osoba.foto_url ? (
                                 <img src={osoba.foto_url} className="w-full h-full object-cover"/>
                             ) : (
@@ -131,7 +149,7 @@ function DetailOsoby() {
                 <div className="md:col-span-2 space-y-4">
                     <div className="flex items-center justify-between mb-2">
                         <h2 className="text-xl font-bold text-white flex items-center gap-2"><Award className="w-5 h-5 text-blue-400"/> Licence</h2>
-                        {isOwner(osoba.id) && <button className="text-xs bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition-colors text-white">+ Přidat</button>}
+                        {isOwner(osoba.id) && <button className="text-xs bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition-colors text-white hidden">+ Přidat</button>}
                     </div>
 
                     {osoba.licence && osoba.licence.length > 0 ? (
@@ -180,7 +198,7 @@ function DetailOsoby() {
                                             {isExpired ? 'Platnost vypršela' : `Zbývá ${daysLeft} dní`}
                                         </div>
                                         
-                                        {/* TLAČÍTKO PRODLOUŽENÍ (Zobrazit jen majiteli a pokud se blíží konec) */}
+                                        {/* TLAČÍTKO PRODLOUŽENÍ */}
                                         {isOwner(osoba.id) && (
                                             lic.zadost_o_prodlouzeni ? (
                                                 <span className="text-xs text-yellow-400 font-medium flex items-center gap-1"><Clock className="w-3 h-3"/> Čeká na schválení</span>

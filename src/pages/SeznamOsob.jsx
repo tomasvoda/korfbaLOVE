@@ -1,19 +1,16 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
-import { supabase } from '../supabaseClient'
 import { Link } from 'react-router-dom'
 import { Search, Shield, SlidersHorizontal, Check, RefreshCw } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
-import { useData } from '../contexts/DataContext' // IMPORT NOVÉHO KONTEXTU
+import { useData } from '../contexts/DataContext'
 import toast from 'react-hot-toast'
+import { supabase } from '../supabaseClient'
 
 const PORADI_UROVNI = { 'A': 1, 'B': 2, 'C': 3, 'D': 4, 'Mezinárodní': 1, 'Národní': 2, 'Neurčeno': 99 }
 
 function SeznamOsob() {
     const { user, profil } = useAuth()
-    
-    // --- ZMĚNA: TADY UŽ NESTAHUJEME, ALE BEREME Z PAMĚTI ---
     const { osoby, loading, fetchOsoby } = useData() 
-    // -------------------------------------------------------
 
     const [search, setSearch] = useState('')
     const [isRefreshing, setIsRefreshing] = useState(false)
@@ -22,20 +19,53 @@ function SeznamOsob() {
     const [isFilterOpen, setIsFilterOpen] = useState(false)
     const filterRef = useRef(null)
 
-    // Funkce pro manuální refresh tlačítkem
     const handleRefresh = async () => {
         setIsRefreshing(true)
-        await fetchOsoby(true) // Force true = vynutit stažení
+        await fetchOsoby(true)
         setIsRefreshing(false)
+        toast.success("Seznam aktualizován")
     }
     
-    // Zbytek logiky (forcePair, filtry, SkeletonCard, OsobaCard) zůstává STEJNÝ...
-    // Jen smažte ten starý `useEffect` s `fetchData`, ten už dělá DataContext.
-    
-    // (Zde pro jistotu uvádím zkrácenou verzi renderu, aby bylo vidět, kam napojit handleRefresh)
+    // --- OPRAVENÁ FUNKCE PÁROVÁNÍ ---
+    const forcePair = async () => {
+        if (!user) return
+        const toastId = toast.loading("Hledám váš profil v databázi...")
+        
+        try {
+            // 1. Najdeme osobu podle emailu (ignorujeme velká/malá písmena)
+            const { data, error } = await supabase
+                .from('osoby')
+                .select('*')
+                .ilike('email', user.email.trim())
+                .maybeSingle()
 
-    // ... forcePair ...
-    const forcePair = async () => { /* ... stejný kód ... */ }
+            if (error) throw error
+
+            if (!data) {
+                toast.error(`Profil pro e-mail "${user.email}" v databázi neexistuje. Kontaktujte svaz.`, { id: toastId, duration: 5000 })
+                return
+            }
+
+            // 2. Pokud profil existuje, zapíšeme do něj auth_id
+            const { error: updateError } = await supabase
+                .from('osoby')
+                .update({ auth_id: user.id })
+                .eq('id', data.id)
+
+            if (updateError) throw updateError
+
+            toast.success("Úspěšně propojeno! Obnovuji...", { id: toastId })
+            
+            // 3. Obnovíme data v aplikaci a reloadneme pro jistotu
+            await fetchOsoby(true)
+            setTimeout(() => window.location.reload(), 1000)
+
+        } catch (err) {
+            console.error(err)
+            toast.error("Chyba párování: " + err.message, { id: toastId })
+        }
+    }
+    // --------------------------------
 
     useEffect(() => {
         const handleClickOutside = (e) => { if (filterRef.current && !filterRef.current.contains(e.target)) setIsFilterOpen(false) }
@@ -43,7 +73,6 @@ function SeznamOsob() {
         return () => document.removeEventListener("mousedown", handleClickOutside)
     }, [])
     
-    // Skeleton a OsobaCard komponenty sem vložte stejné jako minule...
     const SkeletonCard = () => (
         <div className="glass-panel p-4 rounded-2xl flex items-center gap-4 border border-white/5">
              <div className="w-12 h-12 rounded-full bg-slate-800 animate-pulse shrink-0"></div>
@@ -79,7 +108,6 @@ function SeznamOsob() {
         )
     }
 
-    // Výpočet dat (Memo)
     const zpracovanaData = useMemo(() => {
         let filtered = osoby.filter(o => {
             const fullText = `${o.jmeno} ${o.prijmeni} ${o.kluby?.nazev || ''}`.toLowerCase()
@@ -104,10 +132,25 @@ function SeznamOsob() {
         return { mode: 'flat', data: filtered }
     }, [osoby, search, filterRole, onlyActive])
 
-
     return (
-        <div className="max-w-6xl mx-auto p-4 pb-32 pt-8">
-            {/* ... Záchranné tlačítko a hlavička stejné ... */}
+        <div className="max-w-6xl mx-auto p-4 pb-32 pt-8 page-enter">
+            {/* ALERT PRO NESPÁROVANÉ UŽIVATELE */}
+            {user && !profil && (
+                <div className="mb-6 p-6 bg-red-900/40 border border-red-500/50 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4 shadow-2xl shadow-red-900/20">
+                    <div>
+                        <h3 className="text-xl font-bold text-red-400 flex items-center gap-2">⚠️ Chyba propojení</h3>
+                        <p className="text-red-200 text-sm mt-1">
+                            Jste přihlášen jako <strong className="text-white bg-red-500/20 px-1 rounded">{user.email}</strong>, ale tento účet není spárovaný s žádnou osobou v seznamu.
+                        </p>
+                    </div>
+                    <button 
+                        onClick={forcePair} 
+                        className="px-6 py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl shadow-lg transition-transform active:scale-95 whitespace-nowrap"
+                    >
+                        OPRAVIT PROPOJENÍ
+                    </button>
+                </div>
+            )}
             
             <div className="mb-6 text-left">
                 <h1 className="text-3xl font-black text-white leading-none mb-2">Databáze ČKS</h1>
@@ -121,7 +164,6 @@ function SeznamOsob() {
                         <input type="text" placeholder="Hledat..." className="glass-input w-full p-3 pl-10 rounded-xl bg-slate-900/50 focus:bg-slate-900 transition-colors" value={search} onChange={e => setSearch(e.target.value)} />
                     </div>
                     
-                    {/* UPRAVENÉ TLAČÍTKO REFRESH */}
                     <button onClick={handleRefresh} className={`p-3 rounded-xl border border-white/10 glass-input bg-slate-900/50 hover:bg-slate-800 text-slate-300 transition-all ${isRefreshing ? 'animate-spin text-blue-400' : ''}`}>
                         <RefreshCw className="w-5 h-5"/>
                     </button>
@@ -129,7 +171,6 @@ function SeznamOsob() {
                     <button onClick={() => setIsFilterOpen(!isFilterOpen)} className={`p-3 rounded-xl border transition-all flex items-center gap-2 ${isFilterOpen || filterRole !== 'all' ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-500/20' : 'glass-input bg-slate-900/50 hover:bg-slate-800 text-slate-300'}`}>
                         <SlidersHorizontal className="w-5 h-5"/>
                     </button>
-                    {/* ... Dropdown filtrů stejný ... */}
                     {isFilterOpen && (
                         <div className="absolute top-full right-0 mt-2 w-72 bg-[#1e293b] border border-white/10 rounded-2xl shadow-2xl p-4 z-50 animate-fadeIn ring-1 ring-black/50">
                              <div className="flex justify-between items-center mb-4"><span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Zobrazit roli</span>{filterRole !== 'all' && <button onClick={() => setFilterRole('all')} className="text-xs text-blue-400 hover:text-white">Reset</button>}</div>
@@ -149,7 +190,6 @@ function SeznamOsob() {
                 </div>
             </div>
 
-            {/* RENDER - ZDE SE POUŽÍVÁ LOADING Z DATA CONTEXTU */}
             {loading ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
                     {[1, 2, 3, 4, 5, 6].map(i => <SkeletonCard key={i} />)}
@@ -162,7 +202,7 @@ function SeznamOsob() {
             ) : (
                 <div className="space-y-8 pt-2">
                     {zpracovanaData.keys.map(uroven => (
-                        <div key={uroven} className="animate-fadeIn scroll-mt-32">
+                        <div key={uroven} className="scroll-mt-32">
                              <div className="flex items-center gap-3 mb-4 sticky top-24 z-20 bg-[#0f172a] py-2 w-fit pr-4 rounded-r-xl border-y border-r border-white/5 shadow-xl md:static md:bg-transparent md:border-none md:shadow-none">
                                 <h2 className="text-xl font-bold text-white flex items-center gap-2"><span className={`w-2 h-8 rounded-full ${filterRole === 'trener' ? 'bg-blue-500' : 'bg-red-500'}`}></span>Třída {uroven}</h2>
                                 <span className="text-xs font-bold text-slate-500 bg-white/5 px-2 py-1 rounded-md">{zpracovanaData.data[uroven].length}</span>
