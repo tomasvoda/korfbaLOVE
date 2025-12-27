@@ -1,0 +1,65 @@
+import { useState } from 'react'
+import { supabase } from '../supabaseClient'
+import { Link } from 'react-router-dom'
+import { Mail, ArrowLeft, Loader2 } from 'lucide-react'
+import toast from 'react-hot-toast'
+
+function ForgotPassword() {
+    const [email, setEmail] = useState('')
+    const [loading, setLoading] = useState(false)
+
+    const handleReset = async (e) => {
+        e.preventDefault()
+        setLoading(true)
+        // Odeslání resetovacího mailu
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: window.location.origin + '/update-password',
+        })
+
+        if (error) {
+            toast.error("Chyba: " + error.message)
+        } else {
+            toast.success("Zkontrolujte svůj e-mail!", { duration: 5000 })
+            setEmail('')
+        }
+        setLoading(false)
+    }
+
+    return (
+        <div className="min-h-screen flex items-center justify-center p-4 page-enter">
+            <div className="max-w-md w-full glass-panel p-8 rounded-3xl border border-white/10 relative bg-[#0f172a]/50">
+                <Link to="/login" className="absolute top-6 left-6 text-slate-400 hover:text-white transition-colors">
+                    <ArrowLeft className="w-6 h-6"/>
+                </Link>
+                
+                <div className="text-center mb-8 mt-4">
+                    <h1 className="text-2xl font-black text-white mb-2">Zapomenuté heslo</h1>
+                    <p className="text-slate-400 text-sm">Zadejte e-mail účtu, který chcete obnovit.</p>
+                </div>
+
+                <form onSubmit={handleReset} className="space-y-4">
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">Váš E-mail</label>
+                        <div className="relative">
+                            <Mail className="absolute left-4 top-3.5 text-slate-500 w-5 h-5"/>
+                            <input 
+                                type="email" 
+                                required
+                                value={email}
+                                onChange={e => setEmail(e.target.value)}
+                                className="w-full bg-slate-900/50 border border-white/10 rounded-xl p-3 pl-12 text-white focus:outline-none focus:border-blue-500 transition-colors"
+                                placeholder="jan.novak@email.cz"
+                            />
+                        </div>
+                    </div>
+
+                    <button disabled={loading} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2 active:scale-95">
+                        {loading ? <Loader2 className="w-5 h-5 animate-spin"/> : 'Odeslat instrukce'}
+                    </button>
+                </form>
+            </div>
+        </div>
+    )
+}
+
+export default ForgotPassword
