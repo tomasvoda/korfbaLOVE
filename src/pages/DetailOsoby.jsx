@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
-import { ArrowLeft, Mail, Phone, Shield, Award, Loader2 } from 'lucide-react'
+import { ArrowLeft, Mail, Phone, Shield, Award, Loader2, Plus } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useData } from '../contexts/DataContext'
 import toast from 'react-hot-toast'
 import { LicenceCard } from '../components/LicenceCard'
 import { LicenceEditModal } from '../components/LicenceEditModal'
 import { DetailLicence } from '../components/DetailLicence'
-import { spocitatKredityDetail } from '../utils/dateUtils' // Import výpočtu
+import { AddLicenceModal } from '../components/AddLicenceModal' // <--- IMPORT
+import { spocitatKredityDetail } from '../utils/dateUtils'
 
 function DetailOsoby() {
     const { id } = useParams()
@@ -18,8 +19,11 @@ function DetailOsoby() {
     
     const [osoba, setOsoba] = useState(null)
     const [loading, setLoading] = useState(true)
+    
+    // Stavy pro modaly
     const [editingLicence, setEditingLicence] = useState(null)
     const [selectedLicence, setSelectedLicence] = useState(null)
+    const [showAddLicence, setShowAddLicence] = useState(false) // <--- NOVÝ STAV
 
     // Načítání dat
     useEffect(() => {
@@ -28,7 +32,6 @@ function DetailOsoby() {
         const fetchFresh = async () => {
             if (!osoba && osoby.length === 0) setLoading(true)
             
-            // DŮLEŽITÉ: Načítáme i 'cinnosti(*)', abychom z nich mohli počítat
             const { data, error } = await supabase
                 .from('osoby')
                 .select('*, licence(*), cinnosti(*), kluby(nazev)')
@@ -79,7 +82,7 @@ function DetailOsoby() {
         }
     }
     
-    // Refresh (volá se po zavření detailu činností)
+    // Refresh dat (volá se po přidání/editaci)
     const refreshData = async () => {
         const { data } = await supabase.from('osoby').select('*, licence(*), cinnosti(*), kluby(nazev)').eq('id', id).maybeSingle()
         if (data) setOsoba(data)
@@ -121,38 +124,35 @@ function DetailOsoby() {
                 <div className="md:col-span-2 space-y-4">
                     <div className="flex items-center justify-between mb-2">
                         <h2 className="text-xl font-bold text-white flex items-center gap-2"><Award className="w-5 h-5 text-blue-400"/> Licence</h2>
+                        
+                        {/* TLAČÍTKO PRO PŘIDÁNÍ LICENCE (Vidí majitel i Admin) */}
+                        {canEdit && (
+                            <button onClick={() => setShowAddLicence(true)} className="text-xs font-bold bg-white/5 hover:bg-white/10 text-white px-3 py-1.5 rounded-lg border border-white/10 transition-all flex items-center gap-2">
+                                <Plus className="w-3 h-3"/> Nová licence
+                            </button>
+                        )}
                     </div>
 
                     {osoba.licence && osoba.licence.length > 0 ? (
                         osoba.licence.map(lic => {
-                            // --- DYNAMICKÝ VÝPOČET STATISTIK ---
                             let aktualniKredity = 0
                             let predpokladKredity = 0
 
-                            // 1. Projdeme všechny činnosti osoby
                             if (osoba.cinnosti) {
-                                // 2. Vybereme jen ty, které patří k roli této licence
                                 const relevantniCinnosti = osoba.cinnosti.filter(c => c.role === lic.typ_role)
-                                
                                 relevantniCinnosti.forEach(akt => {
-                                    // 3. Spočítáme kredity (proběhlé vs. celkové)
                                     const { aktualni, celkem } = spocitatKredityDetail(akt)
                                     aktualniKredity += aktualni
                                     predpokladKredity += celkem
                                 })
                             }
                             
-                            // Fallback: Pokud nemá činnosti, použijeme statickou hodnotu z DB nebo 0
                             if (predpokladKredity === 0 && lic.kredity > 0) {
                                 predpokladKredity = lic.kredity
-                                aktualniKredity = lic.kredity // Pokud je to ručně zadané, bereme to jako hotové
+                                aktualniKredity = lic.kredity 
                             }
 
-                            const stats = { 
-                                current: aktualniKredity, 
-                                projected: predpokladKredity, 
-                                req: 150 // Cíl
-                            }
+                            const stats = { current: aktualniKredity, projected: predpokladKredity, req: 150 }
 
                             return (
                                 <LicenceCard 
@@ -174,6 +174,8 @@ function DetailOsoby() {
                 </div>
             </div>
 
+            {/* MODALY */}
+            
             {editingLicence && (
                 <LicenceEditModal 
                     licence={editingLicence} 
@@ -190,6 +192,15 @@ function DetailOsoby() {
                     osobaId={osoba.id} 
                     onClose={() => setSelectedLicence(null)}
                     refreshParent={refreshData}
+                />
+            )}
+
+            {/* NOVÝ MODAL PRO PŘIDÁNÍ */}
+            {showAddLicence && (
+                <AddLicenceModal 
+                    osobaId={osoba.id}
+                    onClose={() => setShowAddLicence(false)}
+                    onSave={refreshData}
                 />
             )}
         </div>
