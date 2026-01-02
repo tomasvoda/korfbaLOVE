@@ -86,7 +86,7 @@ export function AddLicenceModal({ osobaId, onClose, onSave }) {
                 <form onSubmit={handleSubmit} className="p-6 space-y-5">
                     
                     {/* Role a Úroveň */}
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <label className="text-xs font-bold text-slate-400 uppercase">Typ role</label>
                             <select className="glass-input w-full p-3 rounded-xl bg-slate-900" value={formData.typ_role} onChange={e => setFormData({...formData, typ_role: e.target.value})}>

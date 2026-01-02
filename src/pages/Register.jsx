@@ -139,7 +139,7 @@ function Register() {
                     {/* 1. OSOBNÍ ÚDAJE */}
                     <div className="space-y-4">
                         <h3 className="text-xs font-bold text-blue-400 uppercase tracking-wider border-b border-white/5 pb-2">1. Osobní údaje</h3>
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <input type="text" placeholder="Jméno" className="glass-input w-full p-3 rounded-xl" value={formData.jmeno} onChange={e => setFormData({...formData, jmeno: e.target.value})} required />
                             <input type="text" placeholder="Příjmení" className="glass-input w-full p-3 rounded-xl" value={formData.prijmeni} onChange={e => setFormData({...formData, prijmeni: e.target.value})} required />
                         </div>
@@ -161,7 +161,7 @@ function Register() {
                     <div className="space-y-4">
                         <h3 className="text-xs font-bold text-green-400 uppercase tracking-wider border-b border-white/5 pb-2 pt-2">2. Licence / Aktivace</h3>
                         
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                              <div className="space-y-1">
                                 <label className="text-[10px] font-bold text-slate-500 uppercase">Role</label>
                                 <select className="glass-input w-full p-3 rounded-xl bg-slate-900" value={formData.typ_role} onChange={e => setFormData({...formData, typ_role: e.target.value})}>
