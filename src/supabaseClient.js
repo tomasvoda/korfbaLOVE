@@ -1,11 +1,8 @@
 import { createClient } from '@supabase/supabase-js'
 
-// 1. Jdi na https://supabase.com/dashboard/project/_/settings/api
-// 2. Zkopíruj "Project URL" a vlož ji do první uvozovky
-const supabaseUrl = 'https://zjbmukwbdqttsnqukrof.supabase.co'
-
-// 3. Zkopíruj "anon public" klíč a vlož ho do druhé uvozovky
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpqYm11a3diZHF0dHNucXVrcm9mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU4NDc2NDgsImV4cCI6MjA4MTQyMzY0OH0.McTRjUtFXLljqEm2d9TCVnITBbyILAVHRWW-7gMFZzA'
+// Preferuj načtení z .env, ale nech fallbacky pro lokální vývoj
+const supabaseUrl = import.meta.env?.VITE_SUPABASE_URL || 'https://zjbmukwbdqttsnqukrof.supabase.co'
+const supabaseKey = import.meta.env?.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpqYm11a3diZHF0dHNucXVrcm9mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU4NDc2NDgsImV4cCI6MjA4MTQyMzY0OH0.McTRjUtFXLljqEm2d9TCVnITBbyILAVHRWW-7gMFZzA'
 
 export const AUTH_STORAGE_KEY = 'korfbal-auth'
 export const AUTH_PERSIST_KEY = 'auth_persist'
@@ -21,18 +18,21 @@ const storageAdapter = {
     getItem: (key) => {
         try {
             return getStorage().getItem(key)
-        } catch (e) {
+        } catch {
             return null
         }
     },
     setItem: (key, value) => {
         try {
             getStorage().setItem(key, value)
-        } catch (e) { }
+        } catch {
+            // Ignoruj např. blokovaný storage
+        }
     },
     removeItem: (key) => {
-        try { localStorage.removeItem(key) } catch (e) { }
-        try { sessionStorage.removeItem(key) } catch (e) { }
+        // Odstraníme jen konkrétní klíč, ne celý storage
+        try { localStorage.removeItem(key) } catch {}
+        try { sessionStorage.removeItem(key) } catch {}
     }
 }
 
@@ -42,13 +42,15 @@ export const setAuthPersist = (remember) => {
         if (!remember) {
             localStorage.removeItem(AUTH_STORAGE_KEY)
         }
-    } catch (e) { }
+    } catch {
+        // nic – jen nemáme „remember me“
+    }
 }
 
 export const clearAuthStorage = () => {
-    try { localStorage.removeItem(AUTH_PERSIST_KEY) } catch (e) { }
-    try { localStorage.removeItem(AUTH_STORAGE_KEY) } catch (e) { }
-    try { sessionStorage.removeItem(AUTH_STORAGE_KEY) } catch (e) { }
+    try { localStorage.removeItem(AUTH_PERSIST_KEY) } catch {}
+    try { localStorage.removeItem(AUTH_STORAGE_KEY) } catch {}
+    try { sessionStorage.removeItem(AUTH_STORAGE_KEY) } catch {}
 }
 
 export const supabase = createClient(supabaseUrl, supabaseKey, {

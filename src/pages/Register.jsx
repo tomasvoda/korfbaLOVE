@@ -33,13 +33,26 @@ function Register() {
     }, [])
 
     const handleFileChange = (e) => {
-        if (e.target.files && e.target.files.length > 0) setFile(e.target.files[0])
+        if (!e.target.files || e.target.files.length === 0) return
+        const selected = e.target.files[0]
+
+        // Základní limit – např. 5 MB
+        const maxSizeMb = 5
+        if (selected.size > maxSizeMb * 1024 * 1024) {
+            toast.error(`Soubor je příliš velký (max ${maxSizeMb} MB).`)
+            e.target.value = ''
+            return
+        }
+
+        setFile(selected)
     }
 
     const handleRegister = async (e) => {
         e.preventDefault()
         if (!file) return toast.error("Musíte nahrát certifikát!")
         if (!formData.klub_id) return toast.error("Vyberte prosím klub.")
+        if (!formData.email.includes('@')) return toast.error("Zadejte platný e-mail.")
+        if (formData.password.length < 8) return toast.error("Heslo musí mít alespoň 8 znaků.")
 
         setLoading(true)
         

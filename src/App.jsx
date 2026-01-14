@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom'
+import { Routes, Route, Link, useLocation, useNavigate, Navigate } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext'
 import { Home, Shield, LogOut, User, Loader2, Crown, Menu, Calendar } from 'lucide-react'
 import { supabase } from './supabaseClient'
@@ -18,6 +18,41 @@ import NovaAkce from './pages/NovaAkce'
 
 // Komponenty
 import { InstallPWA } from './components/InstallPWA' // <--- Nová chytrá instalace
+
+// --- ROUTE OCHRANY ---
+function ProtectedRoute({ children }) {
+    const { user, loading } = useAuth()
+    const location = useLocation()
+
+    if (loading) {
+        return null
+    }
+
+    if (!user) {
+        return <Navigate to="/login" replace state={{ from: location }} />
+    }
+
+    return children
+}
+
+function AdminRoute({ children }) {
+    const { user, isAdmin, loading } = useAuth()
+    const location = useLocation()
+
+    if (loading) {
+        return null
+    }
+
+    if (!user) {
+        return <Navigate to="/login" replace state={{ from: location }} />
+    }
+
+    if (!isAdmin) {
+        return <Navigate to="/" replace state={{ from: location }} />
+    }
+
+    return children
+}
 
 function Navbar() {
     const { user, isAdmin, profil, loading } = useAuth()
@@ -72,7 +107,7 @@ function Navbar() {
 
     return (
         <nav
-            className={`fixed bottom-8 z-[999] transition-all duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] ${containerClasses} flex items-center shadow-lg border border-white/5 bg-[#0f172a]/60 backdrop-blur-xl overflow-hidden`}
+            className={`fixed bottom-8 z-[999] transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${containerClasses} flex items-center shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/10 bg-[#030712]/70 backdrop-blur-2xl saturate-200 overflow-hidden ring-1 ring-white/5`}
             onClick={() => !isExpanded && setIsExpanded(true)}
         >
             {isExpanded ? (
@@ -162,7 +197,14 @@ function App() {
                 <Route path="/akce" element={<KalendarAkci />} />
                 <Route path="/akce/nova" element={<NovaAkce />} />
                 <Route path="/akce/:id" element={<DetailAkce />} />
-                <Route path="/admin" element={<AdminDashboard />} />
+                <Route
+                    path="/admin"
+                    element={
+                        <AdminRoute>
+                            <AdminDashboard />
+                        </AdminRoute>
+                    }
+                />
             </Routes>
         </>
     )

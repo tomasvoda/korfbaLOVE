@@ -10,7 +10,7 @@ const PORADI_UROVNI = { 'A': 1, 'B': 2, 'C': 3, 'D': 4, 'Mezinárodní': 1, 'Ná
 
 function SeznamOsob() {
     const { user, profil } = useAuth()
-    const { osoby, loading, fetchOsoby } = useData()
+    const { osoby, loading, error, fetchOsoby } = useData()
 
     const [search, setSearch] = useState('')
     const [isRefreshing, setIsRefreshing] = useState(false)
@@ -86,14 +86,23 @@ function SeznamOsob() {
             : osoba.licence?.filter(l => onlyActive ? l.aktivni : true).sort((a, b) => a.typ_role.localeCompare(b.typ_role)) || []
 
         return (
-            <Link to={`/osoba/${osoba.id}`} className="glass-panel p-4 rounded-2xl flex items-center gap-4 hover:bg-white/5 transition-all group border border-white/5 hover:border-white/20 hover:scale-[1.01] hover:shadow-xl">
+            <Link to={`/osoba/${osoba.id}`} className="glass-panel p-4 rounded-[24px] flex items-center gap-4 hover:bg-white/5 transition-all group border border-white/5 hover:border-white/20 hover:scale-[1.01] hover:shadow-xl">
                 <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center overflow-hidden border border-white/10 group-hover:border-blue-500/50 transition-colors shrink-0">
                     {osoba.foto_url ? <img src={osoba.foto_url} className="w-full h-full object-cover" /> : <span className="font-bold text-slate-500">{osoba.jmeno[0]}{osoba.prijmeni[0]}</span>}
                 </div>
                 <div className="flex-1 min-w-0">
                     <div className="text-white font-bold truncate">{osoba.prijmeni} {osoba.jmeno}</div>
-                    <div className="text-xs text-slate-400 flex items-center gap-1.5 truncate mb-2">
-                        <Shield className="w-3 h-3 text-slate-600" /> {osoba.kluby?.nazev || 'Bez klubu'}
+                    <div className="text-xs text-slate-400 flex items-center justify-between gap-1.5 truncate mb-2">
+                        <div className="flex items-center gap-1.5 truncate">
+                            <Shield className="w-3 h-3 text-slate-600" /> {osoba.kluby?.nazev || 'Bez klubu'}
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                            {osoba.status_evidence && (
+                                <span className={`w-2 h-2 rounded-full shadow-[0_0_5px] ${osoba.status_evidence === 'aktivní' ? 'bg-green-500 shadow-green-500/50' :
+                                    osoba.status_evidence === 'nejasné' ? 'bg-yellow-500 shadow-yellow-500/50' : 'bg-slate-600 shadow-slate-600/50'
+                                    }`} title={osoba.status_evidence}></span>
+                            )}
+                        </div>
                     </div>
                     <div className="flex flex-wrap gap-2">
                         {licenceKZobrazeni.map(lic => (
@@ -109,9 +118,12 @@ function SeznamOsob() {
     }
 
     const zpracovanaData = useMemo(() => {
+        const normalize = (str) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+        const term = normalize(search)
+
         let filtered = osoby.filter(o => {
-            const fullText = `${o.jmeno} ${o.prijmeni} ${o.kluby?.nazev || ''}`.toLowerCase()
-            const matchesSearch = fullText.includes(search.toLowerCase())
+            const fullText = normalize(`${o.jmeno} ${o.prijmeni} ${o.kluby?.nazev || ''} ${o.status_evidence || ''}`)
+            const matchesSearch = fullText.includes(term)
             let matchesActive = true; if (onlyActive) matchesActive = o.licence.some(l => l.aktivni);
             return matchesSearch && matchesActive
         })
@@ -163,10 +175,22 @@ function SeznamOsob() {
                 </div>
             )}
 
-            <div className="mb-6 text-left">
+            <div className="mb-3 text-left">
                 <h1 className="text-3xl font-black text-white leading-none mb-2">Databáze ČKS</h1>
                 <p className="text-slate-400 text-sm font-medium">Centrální evidence trenérů a rozhodčích</p>
             </div>
+
+            {error && (
+                <div className="mb-4 p-4 rounded-2xl border border-red-500/40 bg-red-500/10 text-sm text-red-200 flex items-center justify-between gap-4">
+                    <span>{error}</span>
+                    <button
+                        onClick={() => fetchOsoby(true)}
+                        className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold"
+                    >
+                        Zkusit znovu
+                    </button>
+                </div>
+            )}
 
             <div className="sticky top-0 z-30 -mx-4 px-4 py-4 bg-[#0f172a]/90 backdrop-blur-xl border-b border-white/5 transition-all shadow-2xl mb-6">
                 <div className="flex gap-2 w-full relative" ref={filterRef}>

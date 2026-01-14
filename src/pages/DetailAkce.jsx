@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
-import { Calendar, MapPin, Clock, ArrowLeft, Users, CheckCircle, XCircle, Loader2, AlertCircle } from 'lucide-react'
+import { Calendar, MapPin, Clock, ArrowLeft, Users, CheckCircle, XCircle, Loader2, AlertCircle, QrCode, Download } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import toast from 'react-hot-toast'
 
@@ -119,8 +119,8 @@ function DetailAkce() {
             <div className="glass-panel rounded-3xl overflow-hidden border border-white/5 mb-8">
                 {/* Header s barvou podle typu */}
                 <div className={`h-32 w-full relative overflow-hidden ${akce.typ === 'skoleni' ? 'bg-blue-900/40' :
-                        akce.typ === 'seminar' ? 'bg-purple-900/40' :
-                            'bg-slate-800'
+                    akce.typ === 'seminar' ? 'bg-purple-900/40' :
+                        'bg-slate-800'
                     }`}>
                     <div className="absolute inset-0 bg-gradient-to-t from-[#0f172a] to-transparent"></div>
                     <div className="absolute bottom-6 left-6 md:left-10">
@@ -201,13 +201,86 @@ function DetailAkce() {
                                         onClick={handlePrihlasit}
                                         disabled={loadingAction || !user}
                                         className={`w-full py-3 rounded-xl font-bold text-white shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 ${!user ? 'bg-slate-700 cursor-not-allowed opacity-50' :
-                                                'bg-blue-600 hover:bg-blue-500 shadow-blue-600/20'
+                                            'bg-blue-600 hover:bg-blue-500 shadow-blue-600/20'
                                             }`}
                                     >
                                         {loadingAction ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Přihlásit se'}
                                     </button>
                                 )}
                                 {!user && <div className="text-xs text-center text-slate-500">Pro přihlášení se musíte přihlásit.</div>}
+                            </div>
+
+                            {/* Exporty a Platba */}
+                            <div className="p-5 rounded-2xl bg-white/5 border border-white/5 flex flex-col gap-6">
+                                {/* Platba */}
+                                {akce.cena > 0 && (
+                                    <div>
+                                        <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Platba</h4>
+                                        <a
+                                            href={`https://api.paylibo.com/paylibo/generator/czech/image?accountPrefix=&accountNumber=1717406504&bankCode=0600&amount=${akce.cena}.00&currency=CZK&vs=&message=${encodeURIComponent(akce.nazev)}`}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="w-full flex items-center justify-center gap-2 py-3 bg-[#1e293b] hover:bg-[#334155] border border-white/10 rounded-xl text-slate-300 transition-all group"
+                                        >
+                                            <QrCode className="w-5 h-5 text-slate-400 group-hover:text-white transition-colors" />
+                                            <span className="text-xs font-bold uppercase tracking-wider">Zaplatit QR kódem</span>
+                                        </a>
+                                    </div>
+                                )}
+
+                                <div>
+                                    <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Kalendář</h4>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <button
+                                            onClick={() => {
+                                                const start = new Date(akce.datum_od).toISOString().replace(/-|:|\.\d+/g, '')
+                                                // Default duration 2h if not specified (backend usually defaults to same day)
+                                                // For now, let's assume 2 hours for simplicity if end date is missing or same
+                                                const endDate = new Date(new Date(akce.datum_od).getTime() + 2 * 60 * 60 * 1000)
+                                                const end = endDate.toISOString().replace(/-|:|\.\d+/g, '')
+
+                                                const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(akce.nazev)}&dates=${start}/${end}&details=${encodeURIComponent(akce.popis || '')}&location=${encodeURIComponent(akce.misto || '')}`
+                                                window.open(url, '_blank')
+                                            }}
+                                            className="flex flex-col items-center justify-center gap-1 p-3 bg-slate-800 hover:bg-slate-700 rounded-xl border border-white/5 transition-colors"
+                                        >
+                                            <Calendar className="w-5 h-5 text-blue-400" />
+                                            <span className="text-[10px] font-bold text-slate-300">Google</span>
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                const start = new Date(akce.datum_od).toISOString().replace(/-|:|\.|Z/g, '') // Basic format 20230101T120000
+                                                const endDate = new Date(new Date(akce.datum_od).getTime() + 2 * 60 * 60 * 1000)
+                                                const end = endDate.toISOString().replace(/-|:|\.|Z/g, '')
+
+                                                const icsContent = `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Korfbal Portal//CZ
+BEGIN:VEVENT
+UID:${akce.id}@korfbal-portal
+DTSTAMP:${new Date().toISOString().replace(/-|:|\.|Z/g, '')}
+DTSTART:${start}
+DTEND:${end}
+SUMMARY:${akce.nazev}
+DESCRIPTION:${(akce.popis || '').replace(/\n/g, '\\n')}
+LOCATION:${akce.misto || ''}
+END:VEVENT
+END:VCALENDAR`
+                                                const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' })
+                                                const link = document.createElement('a')
+                                                link.href = window.URL.createObjectURL(blob)
+                                                link.setAttribute('download', 'event.ics')
+                                                document.body.appendChild(link)
+                                                link.click()
+                                                document.body.removeChild(link)
+                                            }}
+                                            className="flex flex-col items-center justify-center gap-1 p-3 bg-slate-800 hover:bg-slate-700 rounded-xl border border-white/5 transition-colors"
+                                        >
+                                            <Download className="w-5 h-5 text-green-400" />
+                                            <span className="text-[10px] font-bold text-slate-300">Apple / Outlook</span>
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>

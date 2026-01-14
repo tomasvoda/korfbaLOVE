@@ -8,7 +8,7 @@ export function AuthProvider({ children }) {
     const [user, setUser] = useState(null)
     const [profil, setProfil] = useState(null)
     const [loading, setLoading] = useState(true)
-    const [connectionError, setConnectionError] = useState(false) // Nový stav pro tu červenou chybu
+    const [connectionError, setConnectionError] = useState(false) // Stav pro chybu propojení profil <-> auth
 
     // Ref, abychom věděli, zda komponenta stále žije
     const mounted = useRef(true)
@@ -26,29 +26,35 @@ export function AuthProvider({ children }) {
     useEffect(() => {
         mounted.current = true
 
-        // 1. HARD TIMEOUT - ZÁCHRANNÁ BRZDA
-        // Pokud se do 2000ms (2 vteřiny) nerozhodne, vypneme loading natvrdo.
-        // Raději ukážeme login screen nebo chybu, než nekonečné kolečko.
-        const timer = setTimeout(() => {
-            if (mounted.current && loading) {
-                console.warn("Auth trvá moc dlouho -> Vypínám loading.")
-                setLoading(false)
-            }
-        }, 2000)
-
-        // 2. HLAVNÍ INICIALIZACE
+        // Hlavní inicializace
         const init = async () => {
             try {
-                // Získáme session
-                const { data: { session }, error } = await supabase.auth.getSession()
+                // Safety timeout 5s - aby se appka nezasekla
+                const sessionPromise = supabase.auth.getSession()
+                const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve({ error: { message: 'Auth timeout fallback' } }), 5000))
 
-                if (error) {
-                    // Pokud je chyba tokenu, vyčistíme a končíme
-                    console.error("Session Error:", error)
-                    doForceLogout()
+                const { data, error } = await Promise.race([sessionPromise, timeoutPromise])
+
+                if (error || !data?.session) {
+                    if (error) console.error("Session Error/Timeout:", error)
+                    // Pokud token expiroval nebo timeout, vyčistíme session lokálně
+                    // Ale nevoláme signOut() pokud jde o timeout, aby se to nezacyklilo - jen resetujeme state
+                    if (error?.message !== 'Auth timeout fallback') {
+                        await supabase.auth.signOut()
+                        clearAuthStorage()
+                    }
+
+                    if (mounted.current) {
+                        setUser(null)
+                        setProfil(null)
+                        setConnectionError(false)
+                        setLoading(false)
+                    }
                     return
                 }
 
+                // Pokud máme session, zkusíme refresh
+                const session = data.session
                 const validSession = await refreshSessionIfNeeded(session)
 
                 if (validSession?.user) {
@@ -60,13 +66,21 @@ export function AuthProvider({ children }) {
                 }
             } catch (err) {
                 console.error("Init crash:", err)
+                if (mounted.current) {
+                    // Fallback: žádná session -> uživatel bude považován za odhlášeného
+                    setUser(null)
+                    setProfil(null)
+                    setConnectionError(false)
+                    setLoading(false)
+                }
+            } finally {
                 if (mounted.current) setLoading(false)
             }
         }
 
         init()
 
-        // 3. POSLUCHAČ ZMĚN
+        // Posluchač změn auth stavu (login / logout / refresh)
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
             if (!mounted.current) return
 
@@ -82,7 +96,6 @@ export function AuthProvider({ children }) {
 
         return () => {
             mounted.current = false
-            clearTimeout(timer)
             subscription.unsubscribe()
         }
     }, [])
@@ -100,7 +113,7 @@ export function AuthProvider({ children }) {
                 if (refreshData.session?.user) {
                     currentUser = refreshData.session.user
                     setUser(currentUser)
-                    ;({ data, error } = await supabase.from('osoby').select('*').eq('auth_id', currentUser.id).maybeSingle())
+                        ; ({ data, error } = await supabase.from('osoby').select('*').eq('auth_id', currentUser.id).maybeSingle())
                 }
             }
             if (error) throw error
@@ -141,12 +154,10 @@ export function AuthProvider({ children }) {
         }
     }
 
-    // Funkce pro "Hrubý restart" - vyčistí všechno
+    // Funkce pro "Hrubý restart" - vyčistí jen naše auth data
     const doForceLogout = async () => {
         console.log("Provádím Force Logout")
-        try { await supabase.auth.signOut() } catch (e) { }
-        localStorage.clear()
-        sessionStorage.clear()
+        try { await supabase.auth.signOut() } catch (e) { console.error(e) }
         clearAuthStorage()
 
         if (mounted.current) {

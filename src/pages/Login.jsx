@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { supabase, setAuthPersist, AUTH_PERSIST_KEY } from '../supabaseClient'
+import { supabase, setAuthPersist, AUTH_PERSIST_KEY, clearAuthStorage } from '../supabaseClient'
 import { useNavigate, Link } from 'react-router-dom'
 import { Mail, Lock, ArrowRight, Loader2 } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -18,14 +18,40 @@ function Login() {
     const handleLogin = async (e) => {
         e.preventDefault()
         setLoading(true)
-        setAuthPersist(rememberMe)
-        const { error } = await supabase.auth.signInWithPassword({ email, password })
-        if (error) {
-            toast.error(error.message)
+        try {
+            // Pro jistotu ukončíme případnou starou / rozbitou session
+            try {
+                await supabase.auth.signOut()
+                clearAuthStorage()
+            } catch {
+                // ignore
+            }
+
+            setAuthPersist(rememberMe)
+
+            // Timeout pro případ, že Supabase auth neodpovídá (např. výpadek)
+            const TIMEOUT_MS = 10000
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('Přihlášení trvá příliš dlouho, zkuste to prosím znovu.')), TIMEOUT_MS)
+            })
+
+            const { error } = await Promise.race([
+                supabase.auth.signInWithPassword({ email, password }),
+                timeoutPromise
+            ])
+            if (error) {
+                // Uživatel nepotřebuje technický detail, ten je v konzoli
+                console.error('Login error:', error)
+                toast.error('Nepodařilo se přihlásit. Zkontrolujte údaje nebo to zkuste znovu.')
+                setLoading(false)
+            } else {
+                toast.success('Vítejte zpět!')
+                navigate('/')
+            }
+        } catch (err) {
+            console.error('Unexpected login error:', err)
+            toast.error(err.message || 'Nastala neočekávaná chyba při přihlášení.')
             setLoading(false)
-        } else {
-            toast.success('Vítejte zpět!')
-            navigate('/')
         }
     }
 
